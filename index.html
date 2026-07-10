@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>双均线策略回测看板 · 双均线交叉（金叉买入 / 死叉卖出）</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<header>
+  <div class="hdr-inner">
+    <div class="hdr-title">
+      <h1>双均线策略回测看板</h1>
+      <p>Dual Moving Average Crossover — 金叉买入 · 死叉卖出 · 量化工作坊 Task03</p>
+    </div>
+    <div class="hdr-right">
+      <span class="data-tag" id="dataAsOf">数据截至 —</span>
+      <button class="exp-btn" id="expCsv" title="导出交易记录与指标 CSV">导出 CSV</button>
+      <button class="exp-btn" id="expJson" title="导出完整回测报告 JSON">导出 JSON</button>
+    </div>
+  </div>
+</header>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="s-section">
+      <div class="s-title">标的选择</div>
+      <div class="s-field">
+        <select id="stockSel"></select>
+      </div>
+      <div class="s-hint" id="stockInfo"></div>
+    </div>
+
+    <div class="s-section">
+      <div class="s-title">时间窗口</div>
+      <div class="s-field">
+        <label>起始日期</label>
+        <input type="date" id="startDate" />
+      </div>
+      <div class="s-field">
+        <label>结束日期</label>
+        <input type="date" id="endDate" />
+      </div>
+      <div class="s-hint" id="rangeHint"></div>
+    </div>
+
+    <div class="s-section">
+      <div class="s-title">均线参数</div>
+      <div class="s-field">
+        <div class="slider-row"><label>短周期 SMA</label><span class="slider-val" id="vShort">5</span></div>
+        <input type="range" id="pShort" min="2" max="50" value="5" />
+      </div>
+      <div class="s-field">
+        <div class="slider-row"><label>长周期 SMA</label><span class="slider-val" id="vLong">15</span></div>
+        <input type="range" id="pLong" min="5" max="100" value="15" />
+      </div>
+      <div class="s-hint" id="maHint"></div>
+    </div>
+
+    <div class="s-section">
+      <div class="s-title">交易成本</div>
+      <label class="switch">
+        <span><div>手续费（万三）</div><small>双边按成交金额 0.03%</small></span>
+        <input type="checkbox" id="commToggle" checked />
+        <span class="toggle"></span>
+      </label>
+      <label class="switch">
+        <span><div>滑点（万一）</div><small>单边成交价 0.01%</small></span>
+        <input type="checkbox" id="slipToggle" />
+        <span class="toggle"></span>
+      </label>
+    </div>
+
+    <div class="s-section">
+      <div class="s-title">初始资金</div>
+      <div class="s-field">
+        <input type="number" id="pCapital" value="100000" step="1000" min="1000" />
+      </div>
+    </div>
+
+    <div class="s-section">
+      <button class="run-btn" id="runBtn">运行回测</button>
+      <div class="stale-hint" id="staleHint" style="display:none;">⚠ 参数已修改，点击「运行回测」生效</div>
+      <button class="reset-btn" id="resetBtn">重置默认参数</button>
+      <div class="last-updated" id="lastUpdated"></div>
+    </div>
+
+    <div class="s-section">
+      <div class="s-title">策略指标速览</div>
+      <div class="mini-stats">
+        <div class="mini-stat"><span>回测交易日</span><span class="v" id="msDays">-</span></div>
+        <div class="mini-stat"><span>金叉 / 死叉</span><span class="v" id="msSignals">-</span></div>
+        <div class="mini-stat"><span>当前持仓</span><span class="v" id="msPos">-</span></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN DASHBOARD -->
+  <main class="main">
+    <div class="notice">
+      <b>使用说明：</b>本工具加载本地已存储的前复权日线数据，进行双均线交叉策略的模拟回测与可视化分析。
+      调节左侧参数后，按钮会变为高亮「运行回测 ▶」状态，<b>点击「运行回测」</b>才会重新计算并刷新图表与指标。所有结论基于历史数据，<b>仅供学习研究，不构成投资建议</b>。
+    </div>
+
+    <!-- TOP METRICS -->
+    <div class="card">
+      <div class="card-h"><span class="dot"></span>核心回测指标</div>
+      <div class="card-b">
+        <div class="metrics" id="metrics"></div>
+        <div class="metrics-sub" id="metricsSub"></div>
+      </div>
+    </div>
+
+    <!-- EQUITY CHART -->
+    <div class="card">
+      <div class="card-h"><span class="dot"></span>策略净值 vs 买入持有基准</div>
+      <div class="card-b">
+        <div class="legend">
+          <span><i class="swatch" style="background:#e74c3c"></i>策略净值</span>
+          <span><i class="swatch" style="background:#95a5a6"></i>买入持有</span>
+          <span><i class="swatch" style="background:#cbd3dc"></i>1.0 基准线</span>
+        </div>
+        <div class="chart-box" id="equityChart"></div>
+      </div>
+    </div>
+
+    <!-- DRAWDOWN + PRICE -->
+    <div class="two-col">
+      <div class="card">
+        <div class="card-h"><span class="dot"></span>回撤 (%)</div>
+        <div class="card-b">
+          <div class="chart-box" id="drawdownChart"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><span class="dot"></span>价格 + 均线 + 买卖点</div>
+        <div class="card-b">
+          <div class="legend">
+            <span><i class="swatch" style="background:#2c3e50"></i>收盘价</span>
+            <span><i class="swatch" style="background:#e74c3c"></i>SMA(短)</span>
+            <span><i class="swatch" style="background:#3498db"></i>SMA(长)</span>
+            <span><span style="color:#e74c3c">▲</span> 买入</span>
+            <span><span style="color:#27ae60">▼</span> 卖出</span>
+          </div>
+          <div class="chart-box" id="priceChart"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRADES TABLE -->
+    <div class="card">
+      <div class="card-h"><span class="dot"></span>交易记录（完整买卖循环）</div>
+      <div class="card-b no-pad" style="max-height:300px;overflow:auto;">
+        <table id="tradeTable">
+          <thead><tr><th>#</th><th>买入日</th><th>买入价</th><th>卖出日</th><th>卖出价</th><th>持有(天)</th><th>收益率</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- STRATEGY ANALYSIS -->
+    <div class="card">
+      <div class="card-h"><span class="dot"></span>数据诊断 · 策略评价 · 改进建议</div>
+      <div class="card-b">
+        <div class="analysis-row" id="analysis"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="data/stock_data.js"></script>
+<script src="js/strategy.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/analysis.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

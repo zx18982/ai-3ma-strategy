@@ -1,0 +1,809 @@
+# ============================================================
+# 双均线交叉策略 — 规范文件 (Specification)
+# Task 03: Moving Average Crossover Strategy
+# ============================================================
+# 用途：基于中芯国际、比亚迪、长江电力三只典型股票的
+#       日线数据，实现双均线交叉策略（金叉买入/死叉卖出），
+#       进行可视化展示与回测评估（MDD、Sharpe Ratio、
+#       Cumulative Return 等量化指标）。
+# 本 spec 是后续开发的唯一蓝图，所有实现须严格遵循此文件。
+# ============================================================
+
+metadata:
+  name: "双均线交叉策略"
+  task_id: "task03_ma_strategy"
+  version: "1.0.0"
+  description: "基于双均线交叉信号（金叉/死叉）的交易策略，含可视化与回测评估"
+  created_at: "2026-07-10"
+  author: "WorkBuddy"
+  status: "planning"
+
+# ============================================================
+# 一、数据源配置
+# ============================================================
+# 三只典型股票（含 A/H 股），共 5 个上市条目
+# 数据已于 2026-07-10 更新至最新交易日
+# ============================================================
+data_source:
+  # 数据更新信息
+  update_info:
+    last_updated: "2026-07-10"
+    data_range: "近 250 个交易日（约 1 年）"
+    fq_type: "qfq"                # 前复权
+    source: "westock-data CLI"
+    fetch_script: "task03_ma_strategy/fetch_data.py"
+
+  # 股票列表（3 家公司，5 个上市条目）
+  stocks:
+    - code: "sh688981"
+      name: "中芯国际"
+      market: "A"
+      currency: "CNY"
+      group: "中芯国际"
+      industry: "半导体"
+      data_file: "sh688981_daily.json"
+      data_count: 250
+      first_date: "2025-06-23"
+      last_date: "2026-07-10"
+      last_close: 163.02
+
+    - code: "hk00981"
+      name: "中芯国际"
+      market: "HK"
+      currency: "HKD"
+      group: "中芯国际"
+      industry: "半导体"
+      data_file: "hk00981_daily.json"
+      data_count: 250
+      first_date: "2025-07-04"
+      last_date: "2026-07-10"
+      last_close: 79.65
+
+    - code: "sz002594"
+      name: "比亚迪"
+      market: "A"
+      currency: "CNY"
+      group: "比亚迪"
+      industry: "新能源汽车"
+      data_file: "sz002594_daily.json"
+      data_count: 250
+      first_date: "2025-07-01"
+      last_date: "2026-07-10"
+      last_close: 90.00
+
+    - code: "hk01211"
+      name: "比亚迪股份"
+      market: "HK"
+      currency: "HKD"
+      group: "比亚迪"
+      industry: "新能源汽车"
+      data_file: "hk01211_daily.json"
+      data_count: 250
+      first_date: "2025-07-04"
+      last_date: "2026-07-10"
+      last_close: 84.90
+
+    - code: "sh600900"
+      name: "长江电力"
+      market: "A"
+      currency: "CNY"
+      group: "长江电力"
+      industry: "电力"
+      data_file: "sh600900_daily.json"
+      data_count: 250
+      first_date: "2025-07-01"
+      last_date: "2026-07-10"
+      last_close: 28.03
+
+  # 数据字段映射
+  # JSON 文件中每条记录的字段：date, open, close, high, low, volume, amount
+  field_mapping:
+    date: "date"                   # 日期 (YYYY-MM-DD)
+    open: "open"                   # 开盘价
+    close: "close"                 # 收盘价（已从 westock 的 last 重命名）
+    high: "high"                   # 最高价
+    low: "low"                     # 最低价
+    volume: "volume"               # 成交量
+    amount: "amount"               # 成交额
+
+  # 数据目录
+  data_directory: "task03_ma_strategy/data"
+
+# ============================================================
+# 二、策略定义
+# ============================================================
+# 双均线策略核心：短均线上穿长均线 = 金叉（买入信号）
+#                 短均线下穿长均线 = 死叉（卖出信号）
+# ============================================================
+strategy:
+  name: "双均线交叉策略"
+  name_en: "Dual Moving Average Crossover"
+  type: "趋势跟踪策略"
+  description: |
+    利用短期移动平均线与长期移动平均线的交叉关系来判断市场趋势方向。
+    当短均线从下方上穿长均线时形成"金叉"，视为上升趋势启动，产生买入信号；
+    当短均线从上方下穿长均线时形成"死叉"，视为下降趋势启动，产生卖出信号。
+
+  # ----------------------------------------------------------
+  # 2.1 均线参数
+  # ----------------------------------------------------------
+  moving_averages:
+    short_ma:
+      name: "短期均线"
+      name_en: "Short MA"
+      type: "SMA"                  # 简单移动平均
+      period: 5                    # 默认短均线周期
+      description: "5日均线，反映近一周价格走势"
+      color: "#e74c3c"             # 红色
+      width: 2
+
+    long_ma:
+      name: "长期均线"
+      name_en: "Long MA"
+      type: "SMA"                  # 简单移动平均
+      period: 15                   # 默认长均线周期
+      description: "15日均线，反映近三周价格走势"
+      color: "#3498db"             # 蓝色
+      width: 2
+
+    # 可选参数组合（供后续调优参考）
+    alternative_configs:
+      - {short: 5,  long: 15,  label: "短线型 (默认)"}
+      - {short: 10, long: 30,  label: "中线型"}
+      - {short: 20, long: 60,  label: "长线型"}
+      - {short: 5,  long: 20,  label: "激进型"}
+
+  # ----------------------------------------------------------
+  # 2.2 均线计算公式
+  # ----------------------------------------------------------
+  formula: |
+    简单移动平均（SMA）：
+
+      SMA(n)_t = (Close_t + Close_{t-1} + ... + Close_{t-n+1}) / n
+
+    短均线：SMA(5)_t = mean(Close_{t-4} .. Close_t)
+    长均线：SMA(15)_t = mean(Close_{t-14} .. Close_t)
+
+    注：
+    - 前 n-1 个交易日无 SMA 值（NaN），需跳过
+    - 短均线需要至少 5 个交易日，长均线需要至少 15 个交易日
+    - 因此策略信号最早从第 15 个交易日开始
+
+  # ----------------------------------------------------------
+  # 2.3 交易信号定义
+  # ----------------------------------------------------------
+  signals:
+    golden_cross:
+      name: "金叉"
+      name_en: "Golden Cross"
+      condition: "SMA_short_{t} > SMA_long_{t}  AND  SMA_short_{t-1} <= SMA_long_{t-1}"
+      action: "买入"
+      description: "短均线从下方上穿长均线，趋势转多，产生买入信号"
+      marker: "向上箭头 ↑"
+      marker_color: "#e74c3c"      # 红色（涨=买入，中国股市惯例）
+      marker_size: 12
+
+    death_cross:
+      name: "死叉"
+      name_en: "Death Cross"
+      condition: "SMA_short_{t} < SMA_long_{t}  AND  SMA_short_{t-1} >= SMA_long_{t-1}"
+      action: "卖出"
+      description: "短均线从上方下穿长均线，趋势转空，产生卖出信号"
+      marker: "向下箭头 ↓"
+      marker_color: "#27ae60"      # 绿色（跌=卖出，中国股市惯例）
+      marker_size: 12
+
+    # 信号约束
+    constraints:
+      - "金叉和死叉交替出现，不允许连续两个金叉或连续两个死叉"
+      - "首次信号必须为金叉（无仓位时不产生卖出信号）"
+      - "信号在收盘后确认，次日开盘执行（或当日收盘执行）"
+
+  # ----------------------------------------------------------
+  # 2.4 持仓状态定义
+  # ----------------------------------------------------------
+  position:
+    states:
+      flat: "空仓"                 # 无持仓
+      long: "持多"                 # 持有股票
+
+    # 交易规则
+    rules:
+      - "初始状态为空仓 (flat)"
+      - "金叉信号 → 空仓变为持多 (flat → long)"
+      - "死叉信号 → 持多变为空仓 (long → flat)"
+      - "持多状态下忽略金叉信号（不加仓）"
+      - "空仓状态下忽略死叉信号（不做空）"
+
+# ============================================================
+# 三、可视化设计
+# ============================================================
+# 为每只股票生成策略可视化图表
+# ============================================================
+visualization:
+  engine: "ECharts 5.5"            # 与前期任务一致，使用 ECharts
+  theme: "light"                   # 亮色主题
+
+  # 配色方案（遵循中国股市惯例：涨红跌绿）
+  colors:
+    price_line: "#2c3e50"          # 收盘价线 — 深灰蓝
+    short_ma: "#e74c3c"            # 短均线 — 红色
+    long_ma: "#3498db"             # 长均线 — 蓝色
+    buy_marker: "#e74c3c"          # 买入标记 — 红色
+    sell_marker: "#27ae60"         # 卖出标记 — 绿色
+    grid: "#ecf0f1"                # 网格线 — 浅灰
+    text: "#2c3e50"                # 文字 — 深灰蓝
+    background: "#ffffff"          # 背景 — 白色
+    panel_bg: "#f8f9fa"            # 面板背景
+
+  # ----------------------------------------------------------
+  # 3.1 主图表：策略可视化
+  # ----------------------------------------------------------
+  # 图表包含以下图层：
+  #   Layer 1: 收盘价折线
+  #   Layer 2: 短均线 SMA(5) 折线
+  #   Layer 3: 长均线 SMA(15) 折线
+  #   Layer 4: 买入信号标记（向上箭头，红色）
+  #   Layer 5: 卖出信号标记（向下箭头，绿色）
+  #   Layer 6: 持仓区域背景填充（可选）
+  # ----------------------------------------------------------
+  main_chart:
+    title: "{stock_name} ({stock_code}) — 双均线交叉策略"
+    type: "line_chart"
+    x_axis: "date"
+    y_axis: "price"
+    y_axis_label: "价格 ({currency})"
+
+    layers:
+      - name: "收盘价"
+        type: "line"
+        data_field: "close"
+        color: "#2c3e50"
+        width: 1.5
+        smooth: false
+
+      - name: "SMA(5) 短均线"
+        type: "line"
+        data_field: "sma_short"
+        color: "#e74c3c"
+        width: 2
+        smooth: false
+
+      - name: "SMA(15) 长均线"
+        type: "line"
+        data_field: "sma_long"
+        color: "#3498db"
+        width: 2
+        smooth: false
+
+      - name: "买入信号"
+        type: "scatter"
+        data_field: "buy_signals"
+        symbol: "triangle"
+        symbol_size: 15
+        color: "#e74c3c"
+        label:
+          show: true
+          formatter: "买"
+          position: "bottom"
+          font_size: 10
+
+      - name: "卖出信号"
+        type: "scatter"
+        data_field: "sell_signals"
+        symbol: "triangle"
+        symbol_size: 15
+        color: "#27ae60"
+        symbol_rotate: 180
+        label:
+          show: true
+          formatter: "卖"
+          position: "top"
+          font_size: 10
+
+    # 交互
+    interactive:
+      tooltip: true                # 鼠标悬停显示日期/价格/均线值
+      zoom: true                   # 滚轮缩放
+      legend: true                 # 图例可切换显示/隐藏
+
+  # ----------------------------------------------------------
+  # 3.2 回测曲线图
+  # ----------------------------------------------------------
+  backtest_chart:
+    title: "{stock_name} — 策略累计回报 vs 基准"
+    type: "line_chart"
+    x_axis: "date"
+    y_axis: "cumulative_return"
+    y_axis_label: "累计回报 (%)"
+
+    layers:
+      - name: "策略回报"
+        type: "line"
+        data_field: "strategy_cumret"
+        color: "#e74c3c"
+        width: 2
+        area_style: true           # 填充区域
+
+      - name: "买入持有基准"
+        type: "line"
+        data_field: "benchmark_cumret"
+        color: "#95a5a6"
+        width: 1.5
+        style: "dashed"
+
+    # 回撤区域标注
+    drawdown_mark:
+      enabled: true
+      color: "#fadbd8"             # 浅红色填充回撤区域
+
+# ============================================================
+# 四、回测框架
+# ============================================================
+# 模拟交易过程，计算策略性能指标
+# ============================================================
+backtest:
+  # 回测参数
+  params:
+    initial_capital: 100000        # 初始资金（单位：各股票对应币种）
+    position_size: "full"          # 全仓买入/卖出
+    commission_rate: 0.0003        # 交易手续费率（万分之三）
+    slippage: 0                    # 滑点（暂不计入）
+    trade_execution: "next_open"   # 信号次日开盘价执行
+
+  # ----------------------------------------------------------
+  # 4.1 回测流程
+  # ----------------------------------------------------------
+  workflow:
+    step_1: "加载数据：读取 JSON 日线数据，按日期升序排列"
+    step_2: "计算均线：SMA(5) 和 SMA(15)"
+    step_3: "检测信号：遍历每日数据，检测金叉/死叉"
+    step_4: "模拟交易：根据信号执行买卖，记录持仓和资金"
+    step_5: "计算指标：基于交易记录计算量化指标"
+    step_6: "输出结果：图表 + 指标报告"
+
+  # ----------------------------------------------------------
+  # 4.2 交易记录结构
+  # ----------------------------------------------------------
+  trade_record:
+    fields:
+      - "trade_id"                 # 交易编号
+      - "date"                     # 交易日期
+      - "action"                   # 买入/卖出
+      - "price"                    # 成交价格
+      - "shares"                   # 交易股数
+      - "amount"                   # 交易金额
+      - "commission"              # 手续费
+      - "cash_after"              # 交易后现金
+      - "position_after"          # 交易后持仓
+      - "signal_type"             # 金叉/死叉
+
+  # ----------------------------------------------------------
+  # 4.3 每日权益结构
+  # ----------------------------------------------------------
+  daily_equity:
+    fields:
+      - "date"                     # 日期
+      - "close"                    # 当日收盘价
+      - "sma_short"                # 短均线值
+      - "sma_long"                 # 长均线值
+      - "signal"                   # 当日信号 (1=金叉, -1=死叉, 0=无)
+      - "position"                 # 持仓状态 (1=持多, 0=空仓)
+      - "shares"                   # 持有股数
+      - "cash"                     # 现金
+      - "market_value"             # 持仓市值
+      - "total_equity"             # 总权益 = 现金 + 持仓市值
+      - "daily_return"             # 当日收益率
+      - "cumulative_return"        # 累计收益率
+      - "benchmark_return"         # 基准（买入持有）累计收益率
+
+# ============================================================
+# 五、量化指标定义
+# ============================================================
+# 评估策略性能的关键指标
+# ============================================================
+metrics:
+
+  # ----------------------------------------------------------
+  # 5.1 最大回撤 (Maximum Drawdown, MDD)
+  # ----------------------------------------------------------
+  max_drawdown:
+    name_cn: "最大回撤"
+    name_en: "Maximum Drawdown"
+    abbreviation: "MDD"
+    formula: |
+      Step 1 — 计算每日累计权益的历史峰值：
+        Peak_t = max(Total_Equity_1, ..., Total_Equity_t)
+
+      Step 2 — 计算每日回撤：
+        Drawdown_t = (Total_Equity_t - Peak_t) / Peak_t
+
+      Step 3 — 取最大回撤：
+        MDD = min(Drawdown_t) × 100%
+             = max(|Drawdown_t|) × 100%
+
+    interpretation: |
+      MDD 衡量策略从峰值到谷值的最大损失幅度。
+      MDD 越小，策略风险控制越好。
+      一般认为 MDD < 20% 为可接受，MDD > 40% 风险较高。
+
+  # ----------------------------------------------------------
+  # 5.2 夏普比率 (Sharpe Ratio)
+  # ----------------------------------------------------------
+  sharpe_ratio:
+    name_cn: "夏普比率"
+    name_en: "Sharpe Ratio"
+    abbreviation: "Sharpe"
+    formula: |
+      Step 1 — 计算每日收益率：
+        r_t = (Equity_t - Equity_{t-1}) / Equity_{t-1}
+
+      Step 2 — 计算平均日收益率：
+        r_mean = mean(r_t)
+
+      Step 3 — 计算日收益率标准差：
+        r_std = std(r_t)
+
+      Step 4 — 计算日夏普比率：
+        Sharpe_daily = r_mean / r_std
+
+      Step 5 — 年化夏普比率：
+        Sharpe_annual = Sharpe_daily × sqrt(252)
+
+      注：
+      - 252 为年交易日数（A股约244，港股约250，统一取252）
+      - 无风险利率暂设为 0（可按需调整）
+      - 若 r_std = 0，则 Sharpe = 0
+
+    interpretation: |
+      Sharpe Ratio 衡量单位风险下的超额收益。
+      Sharpe > 1：策略表现良好
+      Sharpe > 2：策略表现优秀
+      Sharpe < 0：策略不如无风险投资
+
+  # ----------------------------------------------------------
+  # 5.3 累计回报 (Cumulative Return)
+  # ----------------------------------------------------------
+  cumulative_return:
+    name_cn: "累计回报"
+    name_en: "Cumulative Return"
+    abbreviation: "CumRet"
+    formula: |
+      Step 1 — 策略累计回报：
+        CumRet = (Final_Equity - Initial_Capital) / Initial_Capital × 100%
+
+      Step 2 — 基准累计回报（买入持有）：
+        BenchRet = (Close_last - Close_first) / Close_first × 100%
+
+      Step 3 — 超额收益：
+        Excess = CumRet - BenchRet
+
+    interpretation: |
+      CumRet 是策略在整个回测期间的总收益率。
+      正值表示盈利，负值表示亏损。
+      与基准（买入持有）对比可判断策略是否跑赢市场。
+
+  # ----------------------------------------------------------
+  # 5.4 附加指标（可选）
+  # ----------------------------------------------------------
+  additional_metrics:
+    win_rate:
+      name_cn: "胜率"
+      name_en: "Win Rate"
+      formula: "WinRate = 盈利交易次数 / 总交易次数 × 100%"
+      note: "仅统计完整买卖循环（买入后卖出为一笔交易）"
+
+    avg_holding_days:
+      name_cn: "平均持仓天数"
+      name_en: "Avg Holding Days"
+      formula: "AvgDays = sum(卖出日期 - 买入日期) / 交易次数"
+
+    total_trades:
+      name_cn: "总交易次数"
+      name_en: "Total Trades"
+      formula: "完整的买入-卖出循环次数"
+
+    annual_return:
+      name_cn: "年化收益率"
+      name_en: "Annual Return"
+      formula: "AnnRet = (1 + CumRet)^(252/N_days) - 1"
+      note: "N_days 为回测期间交易日数"
+
+    volatility:
+      name_cn: "年化波动率"
+      name_en: "Annual Volatility"
+      formula: "Vol = r_std × sqrt(252)"
+
+# ============================================================
+# 六、功能模块设计
+# ============================================================
+# 对应用户需求中的 5 个功能点
+# ============================================================
+modules:
+
+  # ----------------------------------------------------------
+  # 模块 1：加载已存储的股价数据
+  # ----------------------------------------------------------
+  module_1_data_loading:
+    name: "数据加载"
+    description: "从 JSON 文件加载三只股票的日线数据"
+    input: "task03_ma_strategy/data/*.json"
+    output: "DataFrame / JS 对象数组"
+    functions:
+      - "load_stock_data(code) — 读取单只股票数据"
+      - "load_all_stocks() — 读取全部股票数据"
+      - "get_stock_list() — 获取股票列表（来自 stocks.json）"
+    data_checks:
+      - "记录数 >= 30（保证均线计算有足够数据）"
+      - "close 列无 NaN"
+      - "日期连续（节假日除外）"
+      - "数据按日期升序排列"
+
+  # ----------------------------------------------------------
+  # 模块 2：计算均线数据
+  # ----------------------------------------------------------
+  module_2_ma_calculation:
+    name: "均线计算"
+    description: "设定短均线(5日)和长均线(15日)周期，计算 SMA"
+    input: "日线数据 (date, close, ...)"
+    output: "添加 sma_short, sma_long 列"
+    functions:
+      - "calculate_sma(data, period) — 计算简单移动平均"
+      - "calculate_moving_averages(data, short_period=5, long_period=15) — 计算双均线"
+    parameters:
+      short_period:
+        default: 5
+        min: 2
+        max: 50
+        description: "短均线周期"
+      long_period:
+        default: 15
+        min: 5
+        max: 100
+        description: "长均线周期"
+    constraints:
+      - "long_period > short_period"
+      - "前 long_period-1 个交易日 sma_long 为 null"
+      - "前 short_period-1 个交易日 sma_short 为 null"
+
+  # ----------------------------------------------------------
+  # 模块 3：计算买卖交易信号
+  # ----------------------------------------------------------
+  module_3_signal_generation:
+    name: "信号生成"
+    description: "基于均线交叉检测金叉/死叉信号"
+    input: "含 sma_short, sma_long 的数据"
+    output: "添加 signal 列 (1=金叉, -1=死叉, 0=无信号)"
+    functions:
+      - "detect_crosses(data) — 检测金叉/死叉"
+      - "get_buy_signals(data) — 提取买入信号点"
+      - "get_sell_signals(data) — 提取卖出信号点"
+    logic: |
+      for t in range(1, len(data)):
+        if sma_short[t] > sma_long[t] and sma_short[t-1] <= sma_long[t-1]:
+          signal[t] = 1  # 金叉
+        elif sma_short[t] < sma_long[t] and sma_short[t-1] >= sma_long[t-1]:
+          signal[t] = -1  # 死叉
+        else:
+          signal[t] = 0  # 无信号
+
+  # ----------------------------------------------------------
+  # 模块 4：可视化图形
+  # ----------------------------------------------------------
+  module_4_visualization:
+    name: "策略可视化"
+    description: "绘制股价、长短均线、交易信号、买卖标记"
+    output: "HTML 交互式图表（ECharts）"
+    charts:
+      - name: "策略主图"
+        description: "收盘价 + SMA(5) + SMA(15) + 买入标记 + 卖出标记"
+        type: "line + scatter"
+        layers:
+          - "收盘价折线"
+          - "SMA(5) 短均线"
+          - "SMA(15) 长均线"
+          - "买入信号（红色向上三角箭头）"
+          - "卖出信号（绿色向下三角箭头）"
+
+      - name: "回测对比图"
+        description: "策略累计回报 vs 买入持有基准"
+        type: "line"
+        layers:
+          - "策略累计回报曲线"
+          - "买入持有基准曲线"
+
+    stock_selection: "支持切换 5 只股票查看"
+    parameter_adjustment: "支持调节短均线/长均线周期，实时重绘"
+
+  # ----------------------------------------------------------
+  # 模块 5：模拟交易与回测
+  # ----------------------------------------------------------
+  module_5_backtest:
+    name: "模拟交易与回测"
+    description: "根据信号模拟交易，计算 MDD、Sharpe Ratio、Cumulative Return 等指标"
+    input: "含 signal 列的数据"
+    output: "回测结果（交易记录 + 每日权益 + 量化指标）"
+    functions:
+      - "run_backtest(data, initial_capital=100000) — 执行回测"
+      - "calculate_metrics(daily_equity) — 计算量化指标"
+      - "generate_report(backtest_result) — 生成回测报告"
+
+    # 回测参数
+    params:
+      initial_capital: 100000
+      commission_rate: 0.0003
+      trade_execution: "next_open"
+
+    # 输出指标
+    output_metrics:
+      - "cumulative_return — 累计回报 (%)"
+      - "benchmark_return — 基准回报 (%)"
+      - "excess_return — 超额收益 (%)"
+      - "max_drawdown — 最大回撤 (%)"
+      - "sharpe_ratio — 年化夏普比率"
+      - "win_rate — 胜率 (%)"
+      - "total_trades — 总交易次数"
+      - "avg_holding_days — 平均持仓天数"
+      - "annual_return — 年化收益率 (%)"
+      - "volatility — 年化波动率 (%)"
+
+# ============================================================
+# 七、输出规范
+# ============================================================
+output:
+  # HTML 交互式工具
+  web_tool:
+    path: "task03_ma_strategy/web_tool/index.html"
+    description: "纯前端交互式双均线策略可视化与回测工具"
+    features:
+      - "股票选择器（5 只股票切换）"
+      - "均线参数调节（短均线/长均线周期滑块）"
+      - "策略主图（价格+均线+买卖标记）"
+      - "回测对比图（策略 vs 基准）"
+      - "量化指标面板（MDD/Sharpe/CumRet 等）"
+      - "交易记录表"
+
+  # 数据文件
+  data_export:
+    enabled: true
+    format: "csv"
+    path: "task03_ma_strategy/output/"
+    files:
+      - "{stock_code}_backtest.csv — 每日权益数据"
+      - "{stock_code}_trades.csv — 交易记录"
+      - "{stock_code}_metrics.json — 量化指标汇总"
+
+  # 汇总报告
+  summary_report:
+    path: "task03_ma_strategy/strategy_report.html"
+    description: "所有股票的策略汇总报告"
+    content:
+      - "各股票策略指标对比表"
+      - "各股票策略可视化图"
+      - "最佳/最差策略分析"
+      - "策略优缺点总结"
+
+# ============================================================
+# 八、文件结构
+# ============================================================
+file_structure:
+  tree: |
+    task03_ma_strategy/
+    ├── spec.yaml                     # 本规范文件
+    ├── fetch_data.py                 # 数据获取脚本
+    ├── data/                         # 股票数据目录
+    │   ├── stocks.json               # 股票列表与元数据
+    │   ├── sh688981_daily.json       # 中芯国际 A股日线
+    │   ├── hk00981_daily.json        # 中芯国际 H股日线
+    │   ├── sz002594_daily.json       # 比亚迪 A股日线
+    │   ├── hk01211_daily.json        # 比亚迪 H股日线
+    │   └── sh600900_daily.json       # 长江电力 A股日线
+    ├── web_tool/                     # 交互式 Web 工具
+    │   ├── index.html                # 主页面
+    │   ├── css/
+    │   │   └── style.css             # 样式文件
+    │   ├── js/
+    │   │   ├── app.js                # 主控制器
+    │   │   ├── strategy.js           # 策略计算引擎（均线+信号+回测）
+    │   │   └── charts.js             # 图表渲染
+    │   └── data/                     # 软链接或复制数据
+    │       └── (同 data/ 目录内容)
+    ├── output/                       # 回测输出
+    │   ├── *.csv                     # 每日权益/交易记录
+    │   └── *.json                    # 指标汇总
+    └── strategy_report.html          # 汇总报告
+
+# ============================================================
+# 九、实现约束与规范
+# ============================================================
+constraints:
+  # 前端实现
+  implementation_rule: |
+    1. Web 工具使用纯 HTML + CSS + JavaScript，无需构建工具
+    2. 图表引擎使用 ECharts 5.5（CDN 引入）
+    3. 策略计算（均线/信号/回测）全部在前端 JS 手动实现
+    4. 禁止使用第三方回测框架（如 backtrader 等）
+    5. 所有计算结果须可追溯，展示中间过程
+
+  # 数据处理
+  data_processing:
+    - "数据按日期升序排列（JSON 已处理）"
+    - "均线计算使用 SMA（简单移动平均），非 EMA"
+    - "前 n-1 个交易日的 SMA 值为 null，不参与信号计算"
+    - "信号在收盘后确认，次日开盘价执行交易"
+
+  # 交易模拟
+  trade_simulation:
+    - "全仓买卖（不支持部分仓位）"
+    - "买入时扣除手续费，卖出时扣除手续费"
+    - "买入时取整到 100 股（1 手）"
+    - "初始资金 100000（各股票对应币种）"
+
+  # 配色规范
+  color_convention: |
+    遵循中国股市惯例：涨=红色，跌=绿色
+    - 买入信号标记：红色 ↑
+    - 卖出信号标记：绿色 ↓
+    - 短均线 SMA(5)：红色
+    - 长均线 SMA(15)：蓝色
+    - 收盘价：深灰蓝
+    - 策略回报曲线：红色
+    - 基准回报曲线：灰色虚线
+
+  # 数值精度
+  decimal_places: 2               # 价格和指标保留2位小数
+
+# ============================================================
+# 十、验收标准
+# ============================================================
+acceptance_criteria:
+  data:
+    - "5 只股票数据已更新至 2026-07-10"
+    - "每只股票至少 200 条日线数据"
+    - "数据包含 date, open, close, high, low, volume, amount 字段"
+  strategy:
+    - "SMA(5) 和 SMA(15) 正确计算"
+    - "金叉/死叉信号正确检测"
+    - "买入信号标记为红色向上箭头"
+    - "卖出信号标记为绿色向下箭头"
+    - "信号交替出现（金叉→死叉→金叉...）"
+  visualization:
+    - "图表显示收盘价、短均线、长均线三条线"
+    - "买卖信号在图表上有明确标记"
+    - "支持切换 5 只股票查看"
+    - "支持调节均线参数并实时重绘"
+    - "配色遵循涨红跌绿惯例"
+  backtest:
+    - "回测模拟完整执行（金叉买入→死叉卖出循环）"
+    - "MDD 计算正确（为负值或0）"
+    - "Sharpe Ratio 正确年化"
+    - "Cumulative Return 正确计算"
+    - "策略回报与买入持有基准可对比"
+    - "指标面板清晰展示所有量化指标"
+  overall:
+    - "浏览器直接打开 index.html 即可使用"
+    - "页面加载后默认显示第一只股票的策略图表"
+    - "所有交互功能正常工作"
+
+# ============================================================
+# 十一、依赖
+# ============================================================
+dependencies:
+  frontend:
+    - "ECharts 5.5 (CDN: https://cdn.jsdelivr.net/npm/echarts@5.5/dist/echarts.min.js)"
+  data:
+    - "westock-data CLI（数据获取，已完成）"
+  python:
+    - "Python >= 3.11（仅用于数据获取脚本）"
+
+# ============================================================
+# 十二、后续扩展方向
+# ============================================================
+future_enhancements:
+  - "支持自定义均线类型（SMA/EMA/WMA）"
+  - "添加止损/止盈机制"
+  - "支持多股票组合策略"
+  - "参数优化：自动寻找最优均线周期组合"
+  - "添加更多指标（RSI/MACD 过滤信号）"
+  - "支持做空机制"
+  - "蒙特卡洛模拟评估策略稳健性"
