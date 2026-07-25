@@ -81,6 +81,7 @@
       $('metricsSub').innerHTML = '';
       $('tradeTable').querySelector('tbody').innerHTML = `<tr><td colspan="7" style="text-align:center;color:#97a3b0;padding:24px;">${r.error}</td></tr>`;
       $('analysis').innerHTML = `<div class="analysis-card" style="grid-column:1/-1;"><h4>无法生成分析</h4><ul><li>${r.error}</li></ul></div>`;
+      $('deepAnalysis').innerHTML = '';
       $('msDays').textContent = '-'; $('msSignals').textContent = '-'; $('msPos').textContent = '-';
       return;
     }
@@ -127,7 +128,11 @@
     }
 
     // 4) 策略分析
-    window.Analysis.renderAnalysis('analysis', { dates: r.dates, closes: r.closes, sS: r.sS, sL: r.sL, sig: r.sig, position: r.position, equity: r.equity, trades: r.trades, metrics: m, params: p });
+    const aligned = bars.filter(b => b.date >= p.startDate && b.date <= p.endDate).slice().sort((a, b) => a.date < b.date ? -1 : 1);
+    const opens = aligned.map(b => b.open), highs = aligned.map(b => b.high), lows = aligned.map(b => b.low), volumes = aligned.map(b => b.volume);
+    const diagCtx = { dates: r.dates, opens, highs, lows, volumes, closes: r.closes, sS: r.sS, sL: r.sL, sig: r.sig, position: r.position, equity: r.equity, trades: r.trades, metrics: m, params: p };
+    window.Analysis.renderAnalysis('analysis', diagCtx);
+    window.Analysis.renderDeep('deepAnalysis', diagCtx);
 
     // 5) 速览
     $('msDays').textContent = m.n;
