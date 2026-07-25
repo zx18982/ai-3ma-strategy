@@ -6,17 +6,25 @@
 
 本工具是一个**纯前端、零部署**的双均线（Moving Average）交叉策略回测看板。它加载本地已存储的前复权日线数据，自动计算短/长周期均线、识别金叉/死叉交易信号，并进行模拟交易回测，最终以交互图表 + 量化指标 + 策略分析的形式呈现结果。
 
-覆盖三只典型标的（A 股 / H 股）：
+覆盖标的（A 股 / H 股，数据截至 **2026-07-24**）：
 
 | 标的 | A 股代码 | H 股代码 |
 |------|----------|----------|
 | 中芯国际 | sh688981 | hk00981 |
 | 比亚迪   | sz002594 | hk01211 |
 | 长江电力 | sh600900 | —        |
+| 兆威机电 | sz003021 | —        |
+| 中际旭创 | sz300308 | —        |
+| 上海环境 | sh601200 | —        |
+| 城投控股 | sh600649 | —        |
+| 国金证券 | sh600109 | —        |
+| 北京银行 | sh601169 | —        |
+| 雅戈尔   | sh600177 | —        |
+| 上海电力 | sh600021 | —        |
 
 ## 功能特性
 
-1. **数据加载**：内置 5 只股票的前复权日线数据（已内嵌，无需联网）。
+1. **数据加载**：内置 13 只股票的前复权日线数据（已内嵌，无需联网，截至 2026-07-24）。
 2. **均线计算**：可调短 / 长 SMA 周期（默认 5 / 15），自动约束长 > 短。
 3. **信号生成**：金叉（短上穿长）→ 买入；死叉（短下穿长）→ 卖出；信号交替约束。
 4. **可视化**：收盘价 + 双均线 + 红▲买入 / 绿▼卖出标记；净值曲线、回撤曲线；鼠标十字光标 tooltip（遵循**涨红跌绿**配色）。
@@ -81,7 +89,19 @@ ai-3ma-strategy/
 └── scripts/
     ├── fetch_data.py       # 数据获取脚本（从行情源拉取最新日线）
     └── raw_data/           # 原始 JSON 日线数据
+├── .nojekyll               # 禁用 Jekyll，确保静态资源按原样发布
+└── .github/
+    └── workflows/
+        └── pages.yml       # GitHub Actions 部署工作流（替代 legacy Pages 构建）
 ```
+
+## 在线部署
+
+本仓库通过 **GitHub Pages + GitHub Actions** 自动部署：推送到 `main` 分支即触发 `.github/workflows/pages.yml`，将整个仓库作为静态产物发布到：
+
+**https://zx18982.github.io/ai-3ma-strategy/**
+
+> 部署方式说明：原 legacy Pages 构建（GitHub 推送即构建）在本项目出现持续性构建失败，已切换为 GitHub Actions 工作流部署（`build_type: workflow`）。`.nojekyll` 用于禁用 Jekyll，避免对 JS/HTML 内联模板进行误处理。
 
 ## 重新生成数据
 
@@ -89,8 +109,7 @@ ai-3ma-strategy/
 
 ```bash
 cd scripts
-python3 fetch_data.py     # 拉取最新前复权日线到 raw_data/
-# 再将 raw_data/*.json 转为 data/stock_data.js（见 fetch_data.py 内说明）
+python3 fetch_data.py     # 拉取最新前复权日线到 raw_data/，并生成 data/stock_data.js
 ```
 
 ## 风险提示

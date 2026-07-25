@@ -8,10 +8,10 @@
       "group": "中芯国际",
       "industry": "半导体",
       "data_file": "sh688981_daily.json",
-      "data_count": 250,
+      "data_count": 260,
       "first_date": "2025-06-23",
-      "last_date": "2026-07-10",
-      "last_close": 163.02
+      "last_date": "2026-07-24",
+      "last_close": 143.73
     },
     {
       "code": "hk00981",
@@ -21,10 +21,10 @@
       "group": "中芯国际",
       "industry": "半导体",
       "data_file": "hk00981_daily.json",
-      "data_count": 250,
-      "first_date": "2025-07-04",
-      "last_date": "2026-07-10",
-      "last_close": 79.65
+      "data_count": 268,
+      "first_date": "2025-06-23",
+      "last_date": "2026-07-24",
+      "last_close": 71.35
     },
     {
       "code": "sz002594",
@@ -34,10 +34,10 @@
       "group": "比亚迪",
       "industry": "新能源汽车",
       "data_file": "sz002594_daily.json",
-      "data_count": 250,
-      "first_date": "2025-07-01",
-      "last_date": "2026-07-10",
-      "last_close": 90.0
+      "data_count": 266,
+      "first_date": "2025-06-23",
+      "last_date": "2026-07-24",
+      "last_close": 91.89
     },
     {
       "code": "hk01211",
@@ -47,10 +47,10 @@
       "group": "比亚迪",
       "industry": "新能源汽车",
       "data_file": "hk01211_daily.json",
-      "data_count": 250,
-      "first_date": "2025-07-04",
-      "last_date": "2026-07-10",
-      "last_close": 84.9
+      "data_count": 268,
+      "first_date": "2025-06-23",
+      "last_date": "2026-07-24",
+      "last_close": 88.65
     },
     {
       "code": "sh600900",
@@ -60,10 +60,114 @@
       "group": "长江电力",
       "industry": "电力",
       "data_file": "sh600900_daily.json",
-      "data_count": 250,
-      "first_date": "2025-07-01",
-      "last_date": "2026-07-10",
-      "last_close": 28.03
+      "data_count": 266,
+      "first_date": "2025-06-23",
+      "last_date": "2026-07-24",
+      "last_close": 28.9
+    },
+    {
+      "code": "sz003021",
+      "name": "兆威机电",
+      "market": "A",
+      "currency": "CNY",
+      "group": "兆威机电",
+      "industry": "机械设备",
+      "data_file": "sz003021_daily.json",
+      "data_count": 266,
+      "first_date": "2025-06-23",
+      "last_date": "2026-07-24",
+      "last_close": 73.62
+    },
+    {
+      "code": "sz300308",
+      "name": "中际旭创",
+      "market": "A",
+      "currency": "CNY",
+      "group": "中际旭创",
+      "industry": "通信设备",
+      "data_file": "sz300308_daily.json",
+      "data_count": 266,
+      "first_date": "2025-06-23",
+      "last_date": "2026-07-24",
+      "last_close": 1046.51
+    },
+    {
+      "code": "sh601200",
+      "name": "上海环境",
+      "market": "A",
+      "currency": "CNY",
+      "group": "上海环境",
+      "industry": "环保",
+      "data_file": "sh601200_daily.json",
+      "data_count": 266,
+      "first_date": "2025-06-23",
+      "last_date": "2026-07-24",
+      "last_close": 6.94
+    },
+    {
+      "code": "sh600649",
+      "name": "城投控股",
+      "market": "A",
+      "currency": "CNY",
+      "group": "城投控股",
+      "industry": "房地产",
+      "data_file": "sh600649_daily.json",
+      "data_count": 266,
+      "first_date": "2025-06-23",
+      "last_date": "2026-07-24",
+      "last_close": 3.52
+    },
+    {
+      "code": "sh600109",
+      "name": "国金证券",
+      "market": "A",
+      "currency": "CNY",
+      "group": "国金证券",
+      "industry": "券商",
+      "data_file": "sh600109_daily.json",
+      "data_count": 266,
+      "first_date": "2025-06-23",
+      "last_date": "2026-07-24",
+      "last_close": 8.44
+    },
+    {
+      "code": "sh601169",
+      "name": "北京银行",
+      "market": "A",
+      "currency": "CNY",
+      "group": "北京银行",
+      "industry": "银行",
+      "data_file": "sh601169_daily.json",
+      "data_count": 266,
+      "first_date": "2025-06-23",
+      "last_date": "2026-07-24",
+      "last_close": 5.06
+    },
+    {
+      "code": "sh600177",
+      "name": "雅戈尔",
+      "market": "A",
+      "currency": "CNY",
+      "group": "雅戈尔",
+      "industry": "服装家纺",
+      "data_file": "sh600177_daily.json",
+      "data_count": 266,
+      "first_date": "2025-06-23",
+      "last_date": "2026-07-24",
+      "last_close": 7.74
+    },
+    {
+      "code": "sh600021",
+      "name": "上海电力",
+      "market": "A",
+      "currency": "CNY",
+      "group": "上海电力",
+      "industry": "电力",
+      "data_file": "sh600021_daily.json",
+      "data_count": 266,
+      "first_date": "2025-06-23",
+      "last_date": "2026-07-24",
+      "last_close": 14.21
     }
   ]
 }
